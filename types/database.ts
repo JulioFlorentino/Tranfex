@@ -39,43 +39,84 @@ export interface Database {
           activo?: boolean;
           creado_en?: string;
         };
+        Relationships: [];
+      };
+      reservaciones: {
+        Row: {
+          id_reservacion: number;
+          usuario_id: string;
+          ruta_id: number;
+          viaje_id: number | null;
+          fecha_reserva: string;
+          asientos: number;
+          estado: string;
+          total: number;
+        };
+        Insert: {
+          id_reservacion?: number;
+          usuario_id: string;
+          ruta_id: number;
+          viaje_id?: number | null;
+          fecha_reserva?: string;
+          asientos?: number;
+          estado?: string;
+          total: number;
+        };
+        Update: {
+          id_reservacion?: number;
+          usuario_id?: string;
+          ruta_id?: number;
+          viaje_id?: number | null;
+          fecha_reserva?: string;
+          asientos?: number;
+          estado?: string;
+          total?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "reservaciones_ruta_id_fkey";
+            columns: ["ruta_id"];
+            isOneToOne: false;
+            referencedRelation: "rutas";
+            referencedColumns: ["id_ruta"];
+          },
+        ];
       };
       tickets: {
         Row: {
-          id: string;
-          user_id: string;
-          route_id: string;
-          qr_code: string;
-          status: "active" | "used" | "expired" | "cancelled";
-          purchased_at: string;
-          expires_at: string;
-          validated_at: string | null;
-          validated_by: string | null;
+          id_ticket: number;
+          reservacion_id: number;
+          codigo_ticket: string;
+          asiento: string | null;
+          estado: string;
+          emitido_en: string;
         };
         Insert: {
-          id?: string;
-          user_id: string;
-          route_id: string;
-          qr_code?: string;
-          status?: "active" | "used" | "expired" | "cancelled";
-          purchased_at?: string;
-          expires_at: string;
-          validated_at?: string | null;
-          validated_by?: string | null;
+          id_ticket?: number;
+          reservacion_id: number;
+          codigo_ticket: string;
+          asiento?: string | null;
+          estado?: string;
+          emitido_en?: string;
         };
         Update: {
-          id?: string;
-          user_id?: string;
-          route_id?: string;
-          qr_code?: string;
-          status?: "active" | "used" | "expired" | "cancelled";
-          purchased_at?: string;
-          expires_at?: string;
-          validated_at?: string | null;
-          validated_by?: string | null;
+          id_ticket?: number;
+          reservacion_id?: number;
+          codigo_ticket?: string;
+          asiento?: string | null;
+          estado?: string;
+          emitido_en?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "tickets_reservacion_id_fkey";
+            columns: ["reservacion_id"];
+            isOneToOne: false;
+            referencedRelation: "reservaciones";
+            referencedColumns: ["id_reservacion"];
+          },
+        ];
       };
-      // TODO: Add remaining tables once schema is shared
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
