@@ -6,13 +6,8 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
-  TouchableOpacity,
-  Modal,
-  Pressable,
-  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import QRCode from "qrcode";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -64,11 +59,9 @@ const estadoConfig: Record<string, { label: string; color: string }> = {
 function TicketCard({
   ticket,
   colors,
-  onPress,
 }: {
   ticket: TicketConDetalles;
   colors: typeof Colors.dark;
-  onPress: (ticket: TicketConDetalles) => void;
 }) {
   const ruta = ticket.reservaciones?.rutas;
   const reserva = ticket.reservaciones;
@@ -78,9 +71,7 @@ function TicketCard({
   };
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
-      onPress={() => onPress(ticket)}
+    <View
       style={[
         styles.ticketCard,
         { backgroundColor: colors.card, borderColor: colors.cardBorder },
@@ -166,209 +157,7 @@ function TicketCard({
           </View>
         )}
       </View>
-
-      {/* Ver QR button */}
-      <TouchableOpacity
-        style={[styles.qrButton, { borderColor: colors.cardBorder }]}
-        onPress={() => onPress(ticket)}
-        activeOpacity={0.7}
-      >
-        <IconSymbol name="qrcode" size={16} color={colors.accent} />
-        <Text style={[styles.qrButtonText, { color: colors.accent }]}>
-          Ver código QR
-        </Text>
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
-}
-
-// ── QR Modal ─────────────────────────────────────────────
-
-function TicketModal({
-  ticket,
-  visible,
-  onClose,
-  colors,
-}: {
-  ticket: TicketConDetalles | null;
-  visible: boolean;
-  onClose: () => void;
-  colors: typeof Colors.dark;
-}) {
-  if (!ticket) return null;
-
-  const ruta = ticket.reservaciones?.rutas;
-  const reserva = ticket.reservaciones;
-  const config = estadoConfig[ticket.estado] ?? {
-    label: ticket.estado,
-    color: "#64748B",
-  };
-
-  const qrData = JSON.stringify({
-    id: ticket.id_ticket,
-    code: ticket.codigo_ticket,
-    route: ruta?.codigo,
-    status: ticket.estado,
-  });
-
-  const [qrUri, setQrUri] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!visible) return;
-    QRCode.toDataURL(qrData, { width: 200, margin: 2 })
-      .then(setQrUri)
-      .catch(() => setQrUri(null));
-  }, [qrData, visible]);
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable
-          style={[styles.modalContent, { backgroundColor: colors.card }]}
-          onPress={() => {}}
-        >
-          <View style={styles.modalHandle} />
-
-          {/* Close button */}
-          <TouchableOpacity
-            style={styles.modalCloseBtn}
-            onPress={onClose}
-            activeOpacity={0.7}
-          >
-            <IconSymbol name="xmark.circle.fill" size={28} color={colors.subtitle} />
-          </TouchableOpacity>
-
-          {/* QR Code */}
-          <View style={styles.qrContainer}>
-            <View style={styles.qrWrapper}>
-              {qrUri ? (
-                <Image
-                  source={{ uri: qrUri }}
-                  style={styles.qrImage}
-                />
-              ) : (
-                <ActivityIndicator size="small" color="#000" />
-              )}
-            </View>
-            <Text style={[styles.qrTicketCode, { color: colors.text }]}>
-              {ticket.codigo_ticket}
-            </Text>
-            <View
-              style={[
-                styles.modalEstadoBadge,
-                { backgroundColor: config.color + "20" },
-              ]}
-            >
-              <Text style={[styles.estadoText, { color: config.color }]}>
-                {config.label}
-              </Text>
-            </View>
-          </View>
-
-          {/* Divider */}
-          <View
-            style={[styles.modalDivider, { borderTopColor: colors.cardBorder }]}
-          />
-
-          {/* Info */}
-          <View style={styles.modalInfo}>
-            {ruta && (
-              <View style={styles.modalInfoRow}>
-                <IconSymbol name="bus.fill" size={16} color={colors.accent} />
-                <Text style={[styles.modalInfoLabel, { color: colors.subtitle }]}>
-                  Ruta
-                </Text>
-                <Text style={[styles.modalInfoValue, { color: colors.text }]}>
-                  {ruta.nombre} ({ruta.codigo})
-                </Text>
-              </View>
-            )}
-
-            {ruta && (
-              <View style={styles.modalInfoRow}>
-                <IconSymbol
-                  name="mappin.and.ellipse"
-                  size={16}
-                  color={colors.accent}
-                />
-                <Text style={[styles.modalInfoLabel, { color: colors.subtitle }]}>
-                  Recorrido
-                </Text>
-                <Text style={[styles.modalInfoValue, { color: colors.text }]}>
-                  {ruta.origen} → {ruta.destino}
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.modalInfoRow}>
-              <IconSymbol name="calendar" size={16} color={colors.accent} />
-              <Text style={[styles.modalInfoLabel, { color: colors.subtitle }]}>
-                Emitido
-              </Text>
-              <Text style={[styles.modalInfoValue, { color: colors.text }]}>
-                {formatDate(ticket.emitido_en)}
-              </Text>
-            </View>
-
-            {ticket.asiento && (
-              <View style={styles.modalInfoRow}>
-                <IconSymbol name="chair.fill" size={16} color={colors.accent} />
-                <Text
-                  style={[styles.modalInfoLabel, { color: colors.subtitle }]}
-                >
-                  Asiento
-                </Text>
-                <Text style={[styles.modalInfoValue, { color: colors.text }]}>
-                  {ticket.asiento}
-                </Text>
-              </View>
-            )}
-
-            {reserva && (
-              <View style={styles.modalInfoRow}>
-                <IconSymbol name="dollarsign.circle" size={16} color={colors.accent} />
-                <Text
-                  style={[styles.modalInfoLabel, { color: colors.subtitle }]}
-                >
-                  Total
-                </Text>
-                <Text style={[styles.modalInfoValue, { color: colors.text }]}>
-                  RD${Number(reserva.total).toFixed(2)}
-                </Text>
-              </View>
-            )}
-
-            {reserva && (
-              <View style={styles.modalInfoRow}>
-                <IconSymbol name="person.fill" size={16} color={colors.accent} />
-                <Text
-                  style={[styles.modalInfoLabel, { color: colors.subtitle }]}
-                >
-                  Asientos
-                </Text>
-                <Text style={[styles.modalInfoValue, { color: colors.text }]}>
-                  {reserva.asientos}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Close */}
-          <TouchableOpacity
-            style={[styles.modalCloseButton, { backgroundColor: colors.accent }]}
-            onPress={onClose}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.modalCloseButtonText}>Cerrar</Text>
-          </TouchableOpacity>
-        </Pressable>
-      </Pressable>
-    </Modal>
+    </View>
   );
 }
 
@@ -382,18 +171,6 @@ export default function TicketsScreen() {
   const [tickets, setTickets] = useState<TicketConDetalles[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState<TicketConDetalles | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
-
-  const openTicket = (ticket: TicketConDetalles) => {
-    setSelectedTicket(ticket);
-    setModalVisible(true);
-  };
-
-  const closeModal = () => {
-    setModalVisible(false);
-    setSelectedTicket(null);
-  };
 
   const fetchTickets = useCallback(async () => {
     if (!user) return;
@@ -422,6 +199,7 @@ export default function TicketsScreen() {
         )
       `,
       )
+      .eq("reservaciones.usuario_id", user.id)
       .order("emitido_en", { ascending: false });
 
     if (error) {
@@ -495,7 +273,6 @@ export default function TicketsScreen() {
                     key={ticket.id_ticket}
                     ticket={ticket}
                     colors={colors}
-                    onPress={openTicket}
                   />
                 ))}
               </>
@@ -511,7 +288,6 @@ export default function TicketsScreen() {
                     key={ticket.id_ticket}
                     ticket={ticket}
                     colors={colors}
-                    onPress={openTicket}
                   />
                 ))}
               </>
@@ -519,13 +295,6 @@ export default function TicketsScreen() {
           </>
         )}
       </ScrollView>
-
-      <TicketModal
-        ticket={selectedTicket}
-        visible={modalVisible}
-        onClose={closeModal}
-        colors={colors}
-      />
     </SafeAreaView>
   );
 }
@@ -655,106 +424,5 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     textAlign: "center",
-  },
-
-  // QR button on card
-  qrButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(148,163,184,0.15)",
-  },
-  qrButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: 36,
-    maxHeight: "90%",
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "rgba(148,163,184,0.3)",
-    alignSelf: "center",
-    marginBottom: 16,
-  },
-  modalCloseBtn: {
-    position: "absolute",
-    top: 16,
-    right: 16,
-    zIndex: 1,
-  },
-  qrContainer: {
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 20,
-  },
-  qrWrapper: {
-    padding: 16,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-  },
-  qrImage: {
-    width: 200,
-    height: 200,
-  },
-  qrTicketCode: {
-    fontSize: 18,
-    fontWeight: "700",
-    fontFamily: "monospace",
-    letterSpacing: 1,
-  },
-  modalEstadoBadge: {
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 10,
-  },
-  modalDivider: {
-    borderTopWidth: 1,
-    marginBottom: 16,
-  },
-  modalInfo: {
-    gap: 12,
-    marginBottom: 20,
-  },
-  modalInfoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  modalInfoLabel: {
-    fontSize: 13,
-    width: 70,
-  },
-  modalInfoValue: {
-    fontSize: 14,
-    fontWeight: "600",
-    flex: 1,
-  },
-  modalCloseButton: {
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  modalCloseButtonText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "700",
   },
 });

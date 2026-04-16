@@ -30,11 +30,6 @@ const MAPPING = {
   "bus.fill": "directions-bus",
   "mappin.and.ellipse": "place",
   "arrow.right": "arrow-forward",
-  qrcode: "qr-code-2",
-  "xmark.circle.fill": "cancel",
-  "chair.fill": "event-seat",
-  "dollarsign.circle": "attach-money",
-  "person.fill": "person",
 } as IconMapping;
 
 /**
