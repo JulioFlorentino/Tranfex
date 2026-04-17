@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   StyleSheet,
   View,
   Text,
-  Platform,
   TouchableOpacity,
   ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import MapView, { Polyline, Marker, PROVIDER_DEFAULT } from "react-native-maps";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -16,7 +16,7 @@ import type { Database } from "@/types/database";
 
 type Ruta = Database["public"]["Tables"]["rutas"]["Row"];
 
-const SANTO_DOMINGO = { lng: -69.9312, lat: 18.4861 };
+const SANTO_DOMINGO = { latitude: 18.4861, longitude: -69.9312 };
 
 const ROUTE_COLORS = [
   "#1E6FD9",
@@ -29,317 +29,93 @@ const ROUTE_COLORS = [
   "#F97316",
 ];
 
-// Origin & destination waypoints for each route (Santo Domingo)
-// Some routes have intermediate waypoints to guide the path along specific streets
-const ROUTE_WAYPOINTS: Record<
-  string,
-  { points: [number, number][] }
-> = {
+// [lng, lat] waypoints — same as the web version
+const ROUTE_WAYPOINTS: Record<string, { points: [number, number][] }> = {
   "R-001": {
-    // Villa Mella → Megacentro (Av. Hermanas Mirabal / Charles de Gaulle)
     points: [
-      [-69.9388, 18.5036],
-      [-69.9295, 18.4980],
-      [-69.9170, 18.4900],
-      [-69.8990, 18.4800],
-      [-69.8833, 18.4722],
+      [-69.933, 18.536],
+      [-69.9305, 18.518],
+      [-69.926, 18.502],
+      [-69.918, 18.492],
+      [-69.911, 18.482],
     ],
   },
   "R-002": {
-    // Herrera → San Isidro (Av. Luperón → Av. 27 de Febrero → Autopista Las Américas)
     points: [
-      [-69.9609, 18.4867],
-      [-69.9500, 18.4830],
-      [-69.9350, 18.4790],
-      [-69.9150, 18.4730],
-      [-69.8980, 18.4650],
-      [-69.886, 18.4555],
+      [-69.968, 18.495],
+      [-69.95, 18.489],
+      [-69.932, 18.486],
+      [-69.91, 18.488],
+      [-69.89, 18.493],
+      [-69.876, 18.496],
     ],
   },
   "R-003": {
-    // Los Alcarrizos → Sans Souci (Autopista Duarte → Av. Kennedy → Av. España)
     points: [
-      [-69.9521, 18.4702],
-      [-69.9420, 18.4750],
-      [-69.9300, 18.4810],
-      [-69.9150, 18.4880],
-      [-69.9000, 18.4960],
-      [-69.8774, 18.5103],
+      [-69.986, 18.512],
+      [-69.965, 18.5],
+      [-69.943, 18.49],
+      [-69.92, 18.486],
+      [-69.895, 18.492],
+      [-69.857, 18.5],
     ],
   },
   "R-004": {
-    // Arroyo Hondo → Centro Olímpico (Av. Núñez de Cáceres → Av. 27 de Febrero)
     points: [
-      [-69.9155, 18.5105],
-      [-69.9200, 18.5010],
-      [-69.9240, 18.4920],
-      [-69.9280, 18.4820],
-      [-69.9312, 18.4700],
-      [-69.9312, 18.4551],
+      [-69.943, 18.505],
+      [-69.935, 18.498],
+      [-69.93, 18.492],
+      [-69.925, 18.486],
+      [-69.921, 18.479],
+      [-69.92, 18.473],
     ],
   },
   "R-005": {
-    // Ozama → Av. Máximo Gómez (Puente Duarte → Av. Máximo Gómez)
     points: [
-      [-69.8969, 18.4748],
-      [-69.9050, 18.4790],
-      [-69.9150, 18.4840],
-      [-69.9280, 18.4900],
-      [-69.9400, 18.4950],
-      [-69.9519, 18.5002],
+      [-69.875, 18.483],
+      [-69.885, 18.481],
+      [-69.896, 18.483],
+      [-69.91, 18.487],
+      [-69.922, 18.491],
+      [-69.932, 18.496],
     ],
   },
   "R-006": {
-    // Cristo Rey → Boca Chica (Av. Correa y Cidrón → Autopista Las Américas)
     points: [
-      [-69.943, 18.5122],
-      [-69.9300, 18.5030],
-      [-69.9180, 18.4950],
-      [-69.9050, 18.4860],
-      [-69.8880, 18.4750],
-      [-69.8701, 18.4633],
+      [-69.935, 18.501],
+      [-69.923, 18.496],
+      [-69.91, 18.492],
+      [-69.897, 18.488],
+      [-69.883, 18.486],
+      [-69.868, 18.488],
     ],
   },
   "R-007": {
-    // Los Ríos → Zona Colonial (Av. Tiradentes → Av. Independencia → Calle El Conde)
     points: [
-      [-69.9678, 18.4942],
-      [-69.9540, 18.4890],
-      [-69.9400, 18.4830],
-      [-69.9280, 18.4770],
-      [-69.9150, 18.4700],
-      [-69.902, 18.4599],
+      [-69.96, 18.492],
+      [-69.947, 18.488],
+      [-69.933, 18.484],
+      [-69.919, 18.48],
+      [-69.904, 18.477],
+      [-69.8835, 18.4735],
     ],
   },
   "R-008": {
-    // Gazcue → Villa Mella (Av. Máximo Gómez → Av. Charles de Gaulle)
     points: [
-      [-69.9234, 18.4637],
-      [-69.9270, 18.4730],
-      [-69.9300, 18.4830],
-      [-69.9340, 18.4930],
-      [-69.9370, 18.5040],
-      [-69.9407, 18.5158],
+      [-69.92, 18.471],
+      [-69.924, 18.481],
+      [-69.928, 18.492],
+      [-69.931, 18.504],
+      [-69.932, 18.518],
+      [-69.933, 18.536],
     ],
   },
 };
 
-/**
- * Fetch a street-following route from OSRM (free, no API key).
- * Falls back to a straight line between first/last waypoint on error.
- */
-async function fetchOSRMRoute(
-  waypoints: [number, number][],
-): Promise<[number, number][]> {
-  try {
-    const coords = waypoints.map((p) => `${p[0]},${p[1]}`).join(";");
-    const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`;
-    const res = await fetch(url);
-    const json = await res.json();
-    if (json.code === "Ok" && json.routes?.[0]?.geometry?.coordinates) {
-      return json.routes[0].geometry.coordinates as [number, number][];
-    }
-  } catch {
-    // fall through to fallback
-  }
-  return waypoints;
+// Convert [lng, lat] → { latitude, longitude } for react-native-maps
+function toLatLng(points: [number, number][]) {
+  return points.map(([lng, lat]) => ({ latitude: lat, longitude: lng }));
 }
-
-// ── Web Map Component ────────────────────────────────────
-
-function WebMap({
-  rutas,
-  colors,
-  selectedRoute,
-  onSelectRoute,
-}: {
-  rutas: Ruta[];
-  colors: typeof Colors.dark;
-  selectedRoute: Ruta | null;
-  onSelectRoute: (r: Ruta | null) => void;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-
-  useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
-
-    let cancelled = false;
-
-    (async () => {
-      const maplibregl = await import("maplibre-gl");
-
-      // Inject MapLibre CSS
-      if (!document.getElementById("maplibre-css")) {
-        const link = document.createElement("link");
-        link.id = "maplibre-css";
-        link.rel = "stylesheet";
-        link.href =
-          "https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css";
-        document.head.appendChild(link);
-      }
-
-      if (cancelled || !containerRef.current) return;
-
-      const map = new maplibregl.default.Map({
-        container: containerRef.current,
-        style: "https://tiles.openfreemap.org/styles/liberty",
-        center: [SANTO_DOMINGO.lng, SANTO_DOMINGO.lat],
-        zoom: 12.5,
-        attributionControl: false,
-      });
-
-      mapRef.current = map;
-
-      map.addControl(
-        new maplibregl.default.NavigationControl(),
-        "bottom-right",
-      );
-
-      map.on("load", async () => {
-        // Fetch all OSRM routes in parallel
-        const routeGeometries = await Promise.all(
-          rutas.map(async (ruta) => {
-            const wp = ROUTE_WAYPOINTS[ruta.codigo];
-            if (!wp) return null;
-            const path = await fetchOSRMRoute(wp.points);
-            return { codigo: ruta.codigo, path, origin: wp.points[0], dest: wp.points[wp.points.length - 1] };
-          }),
-        );
-
-        if (cancelled) return;
-
-        rutas.forEach((ruta, idx) => {
-          const geo = routeGeometries.find((g) => g?.codigo === ruta.codigo);
-          if (!geo) return;
-
-          const color = ROUTE_COLORS[idx % ROUTE_COLORS.length];
-          const sourceId = `route-${ruta.codigo}`;
-
-          // Route line (follows streets)
-          map.addSource(sourceId, {
-            type: "geojson",
-            data: {
-              type: "Feature",
-              properties: { codigo: ruta.codigo, nombre: ruta.nombre },
-              geometry: { type: "LineString", coordinates: geo.path },
-            },
-          });
-
-          // Route border (outline for visibility)
-          map.addLayer({
-            id: `${sourceId}-border`,
-            type: "line",
-            source: sourceId,
-            layout: { "line-join": "round", "line-cap": "round" },
-            paint: {
-              "line-color": "#000",
-              "line-width": 7,
-              "line-opacity": 0.15,
-            },
-          });
-
-          map.addLayer({
-            id: `${sourceId}-line`,
-            type: "line",
-            source: sourceId,
-            layout: { "line-join": "round", "line-cap": "round" },
-            paint: {
-              "line-color": color,
-              "line-width": 4,
-              "line-opacity": 0.9,
-            },
-          });
-
-          // Origin marker
-          map.addSource(`${sourceId}-origin`, {
-            type: "geojson",
-            data: {
-              type: "Feature",
-              properties: {},
-              geometry: { type: "Point", coordinates: geo.origin },
-            },
-          });
-
-          map.addLayer({
-            id: `${sourceId}-origin-circle`,
-            type: "circle",
-            source: `${sourceId}-origin`,
-            paint: {
-              "circle-radius": 7,
-              "circle-color": "#fff",
-              "circle-stroke-color": color,
-              "circle-stroke-width": 3,
-            },
-          });
-
-          // Destination marker
-          map.addSource(`${sourceId}-dest`, {
-            type: "geojson",
-            data: {
-              type: "Feature",
-              properties: {},
-              geometry: { type: "Point", coordinates: geo.dest },
-            },
-          });
-
-          map.addLayer({
-            id: `${sourceId}-dest-circle`,
-            type: "circle",
-            source: `${sourceId}-dest`,
-            paint: {
-              "circle-radius": 7,
-              "circle-color": color,
-              "circle-stroke-color": "#fff",
-              "circle-stroke-width": 3,
-            },
-          });
-
-          // Click handler on route line
-          map.on("click", `${sourceId}-line`, () => {
-            const clicked = rutas.find((r) => r.codigo === ruta.codigo);
-            onSelectRoute(clicked ?? null);
-
-            // Fit to route bounds
-            const bounds = geo.path.reduce(
-              (b, c) => b.extend(c as [number, number]),
-              new maplibregl.default.LngLatBounds(
-                geo.path[0],
-                geo.path[0],
-              ),
-            );
-            map.fitBounds(bounds, { padding: 60, duration: 800 });
-          });
-
-          // Cursor pointer on hover
-          map.on("mouseenter", `${sourceId}-line`, () => {
-            map.getCanvas().style.cursor = "pointer";
-          });
-          map.on("mouseleave", `${sourceId}-line`, () => {
-            map.getCanvas().style.cursor = "";
-          });
-        });
-      });
-    })();
-
-    return () => {
-      cancelled = true;
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-    };
-  }, [rutas]);
-
-  return (
-    <div
-      ref={containerRef}
-      style={{ width: "100%", height: "100%", position: "absolute" }}
-    />
-  );
-}
-
-// ── Main Screen ──────────────────────────────────────────
 
 export default function MapaScreen() {
   const colorScheme = useColorScheme();
@@ -348,40 +124,96 @@ export default function MapaScreen() {
   const [selectedRoute, setSelectedRoute] = useState<Ruta | null>(null);
   const [showLegend, setShowLegend] = useState(false);
 
-  if (Platform.OS !== "web") {
-    return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.background }]}
-      >
-        <View style={styles.fallback}>
-          <IconSymbol name="map.fill" size={48} color={colors.subtitle} />
-          <Text style={[styles.fallbackTitle, { color: colors.text }]}>
-            Mapa no disponible
-          </Text>
-          <Text style={[styles.fallbackText, { color: colors.subtitle }]}>
-            El mapa interactivo solo está disponible en la versión web
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const mapRef = useState<MapView | null>(null);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Map */}
-      <WebMap
-        rutas={rutas}
-        colors={colors}
-        selectedRoute={selectedRoute}
-        onSelectRoute={setSelectedRoute}
-      />
+    <View style={styles.container}>
+      <MapView
+        provider={PROVIDER_DEFAULT}
+        style={styles.map}
+        initialRegion={{
+          ...SANTO_DOMINGO,
+          latitudeDelta: 0.12,
+          longitudeDelta: 0.12,
+        }}
+      >
+        {rutas.map((ruta, idx) => {
+          const wp = ROUTE_WAYPOINTS[ruta.codigo];
+          if (!wp) return null;
+
+          const coordinates = toLatLng(wp.points);
+          const color = ROUTE_COLORS[idx % ROUTE_COLORS.length];
+          const isSelected = selectedRoute?.codigo === ruta.codigo;
+          const hasSelection = selectedRoute !== null;
+          const lineColor =
+            hasSelection && !isSelected ? "#9CA3AF" : color;
+          const lineWidth = isSelected ? 6 : 3;
+          const opacity = hasSelection && !isSelected ? 0.35 : 0.9;
+
+          const origin = coordinates[0];
+          const dest = coordinates[coordinates.length - 1];
+
+          return [
+            <Polyline
+              key={`line-${ruta.codigo}`}
+              coordinates={coordinates}
+              strokeColor={lineColor}
+              strokeWidth={lineWidth}
+              strokeColors={[lineColor]}
+              tappable
+              onPress={() => setSelectedRoute(isSelected ? null : ruta)}
+              style={{ opacity }}
+            />,
+            <Marker
+              key={`origin-${ruta.codigo}`}
+              coordinate={origin}
+              anchor={{ x: 0.5, y: 0.5 }}
+              onPress={() => setSelectedRoute(isSelected ? null : ruta)}
+            >
+              <View
+                style={[
+                  styles.markerOuter,
+                  {
+                    borderColor: lineColor,
+                    opacity,
+                  },
+                ]}
+              >
+                <View
+                  style={[styles.markerInner, { backgroundColor: "#fff" }]}
+                />
+              </View>
+            </Marker>,
+            <Marker
+              key={`dest-${ruta.codigo}`}
+              coordinate={dest}
+              anchor={{ x: 0.5, y: 0.5 }}
+              onPress={() => setSelectedRoute(isSelected ? null : ruta)}
+            >
+              <View
+                style={[
+                  styles.markerOuter,
+                  {
+                    borderColor: "#fff",
+                    backgroundColor: lineColor,
+                    opacity,
+                  },
+                ]}
+              />
+            </Marker>,
+          ];
+        })}
+      </MapView>
 
       {/* Top bar */}
       <SafeAreaView style={styles.topBar} edges={["top"]}>
         <View
           style={[
             styles.topBarInner,
-            { backgroundColor: colors.card + "E6", borderColor: colors.cardBorder },
+            {
+              backgroundColor: colors.card + "E6",
+              borderColor: colors.cardBorder,
+            },
           ]}
         >
           <IconSymbol name="map.fill" size={20} color={colors.accent} />
@@ -403,7 +235,10 @@ export default function MapaScreen() {
         <View
           style={[
             styles.legendPanel,
-            { backgroundColor: colors.card + "F2", borderColor: colors.cardBorder },
+            {
+              backgroundColor: colors.card + "F2",
+              borderColor: colors.cardBorder,
+            },
           ]}
         >
           <Text style={[styles.legendTitle, { color: colors.text }]}>
@@ -423,8 +258,7 @@ export default function MapaScreen() {
                   style={[
                     styles.legendColor,
                     {
-                      backgroundColor:
-                        ROUTE_COLORS[idx % ROUTE_COLORS.length],
+                      backgroundColor: ROUTE_COLORS[idx % ROUTE_COLORS.length],
                     },
                   ]}
                 />
@@ -460,13 +294,6 @@ export default function MapaScreen() {
                 {selectedRoute.nombre}
               </Text>
             </View>
-            <TouchableOpacity onPress={() => setSelectedRoute(null)}>
-              <IconSymbol
-                name="chevron.right"
-                size={18}
-                color={colors.subtitle}
-              />
-            </TouchableOpacity>
           </View>
           <View style={styles.routeInfoBody}>
             <View style={styles.routeInfoPoint}>
@@ -479,11 +306,7 @@ export default function MapaScreen() {
                 {selectedRoute.origen}
               </Text>
             </View>
-            <IconSymbol
-              name="arrow.right"
-              size={12}
-              color={colors.subtitle}
-            />
+            <IconSymbol name="arrow.right" size={12} color={colors.subtitle} />
             <View style={styles.routeInfoPoint}>
               <IconSymbol
                 name="mappin.and.ellipse"
@@ -495,33 +318,43 @@ export default function MapaScreen() {
               </Text>
             </View>
           </View>
+          <TouchableOpacity
+            style={[
+              styles.unfollowBtn,
+              { backgroundColor: colors.danger + "18" },
+            ]}
+            onPress={() => setSelectedRoute(null)}
+          >
+            <IconSymbol name="location.fill" size={16} color={colors.danger} />
+            <Text style={[styles.unfollowText, { color: colors.danger }]}>
+              Dejar de seguir
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>
   );
 }
 
-// ── Styles ───────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  fallback: {
-    flex: 1,
+  map: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  markerOuter: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 3,
     justifyContent: "center",
     alignItems: "center",
-    gap: 10,
-    padding: 40,
   },
-  fallbackTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginTop: 8,
-  },
-  fallbackText: {
-    fontSize: 14,
-    textAlign: "center",
+  markerInner: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
 
   // Top bar
@@ -554,8 +387,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 100,
     right: 16,
-    width: 260,
-    maxHeight: 350,
+    width: 240,
+    maxHeight: 320,
     borderRadius: 12,
     borderWidth: 1,
     padding: 14,
@@ -567,7 +400,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   legendScroll: {
-    maxHeight: 280,
+    maxHeight: 260,
   },
   legendItem: {
     flexDirection: "row",
@@ -629,5 +462,18 @@ const styles = StyleSheet.create({
   },
   routeInfoText: {
     fontSize: 13,
+  },
+  unfollowBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  unfollowText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

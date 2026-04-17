@@ -38,3 +38,14 @@ CREATE POLICY "Users can insert own tickets"
         AND r.usuario_id = auth.uid()
     )
   );
+
+-- 6. Tickets: users can DELETE tickets linked to their own reservations
+CREATE POLICY "Users can delete own tickets"
+  ON tickets FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM reservaciones r
+      WHERE r.id_reservacion = tickets.reservacion_id
+        AND r.usuario_id = auth.uid()
+    )
+  );

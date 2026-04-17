@@ -126,6 +126,20 @@ export default function HomeScreen() {
           />
         </View>
 
+        {/* Saldo */}
+        <View style={[styles.balanceCard, { backgroundColor: colors.accent }]}>
+          <View style={styles.balanceTop}>
+            <Text style={styles.balanceLabel}>Saldo disponible</Text>
+            <IconSymbol
+              name="creditcard.fill"
+              size={20}
+              color="rgba(255,255,255,0.7)"
+            />
+          </View>
+          <Text style={styles.balanceAmount}>RD$1,500.00</Text>
+          <Text style={styles.balanceHint}>Tranfex Wallet</Text>
+        </View>
+
         {/* Search */}
         <View
           style={[
@@ -230,6 +244,33 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
+  },
+  balanceCard: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+  },
+  balanceTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  balanceLabel: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  balanceAmount: {
+    color: "#fff",
+    fontSize: 32,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  balanceHint: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 12,
   },
   searchBox: {
     flexDirection: "row",
