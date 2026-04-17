@@ -145,11 +145,11 @@ export default function MapaScreen() {
           const color = ROUTE_COLORS[idx % ROUTE_COLORS.length];
           const isSelected = selectedRoute?.codigo === ruta.codigo;
           const hasSelection = selectedRoute !== null;
-          const lineColor =
-            hasSelection && !isSelected ? "#9CA3AF" : color;
-          const lineWidth = isSelected ? 6 : 3;
-          const opacity = hasSelection && !isSelected ? 0.35 : 0.9;
+          const visible = !hasSelection || isSelected;
 
+          if (!visible) return null;
+
+          const lineWidth = isSelected ? 6 : 3;
           const origin = coordinates[0];
           const dest = coordinates[coordinates.length - 1];
 
@@ -157,12 +157,11 @@ export default function MapaScreen() {
             <Polyline
               key={`line-${ruta.codigo}`}
               coordinates={coordinates}
-              strokeColor={lineColor}
+              strokeColor={color}
               strokeWidth={lineWidth}
-              strokeColors={[lineColor]}
+              strokeColors={[color]}
               tappable
               onPress={() => setSelectedRoute(isSelected ? null : ruta)}
-              style={{ opacity }}
             />,
             <Marker
               key={`origin-${ruta.codigo}`}
@@ -174,8 +173,7 @@ export default function MapaScreen() {
                 style={[
                   styles.markerOuter,
                   {
-                    borderColor: lineColor,
-                    opacity,
+                    borderColor: color,
                   },
                 ]}
               >
@@ -195,8 +193,7 @@ export default function MapaScreen() {
                   styles.markerOuter,
                   {
                     borderColor: "#fff",
-                    backgroundColor: lineColor,
-                    opacity,
+                    backgroundColor: color,
                   },
                 ]}
               />

@@ -1,50 +1,194 @@
-# Welcome to your Expo app 👋
+# Tranfex
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplicación de transporte público para Santo Domingo, República Dominicana. Permite a los usuarios consultar rutas, reservar asientos y gestionar sus tickets digitales.
 
-## Get started
+Desarrollada con **Expo SDK 54**, **React Native**, **TypeScript** y **Supabase**.
 
-1. Install dependencies
+---
 
-   ```bash
-   npm install
-   ```
+## Requisitos previos
 
-2. Start the app
+- Node.js 18+
+- npm
+- Expo CLI (`npm install -g expo-cli`)
+- Cuenta de Supabase con proyecto activo
 
-   ```bash
-   npx expo start
-   ```
+---
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Instalación
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+---
 
-## Learn more
+## Variables de entorno
 
-To learn more about developing your project with Expo, look at the following resources:
+Crea un archivo `.env` en la raíz del proyecto con las siguientes variables:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```env
+EXPO_PUBLIC_SUPABASE_URL=https://<tu-proyecto>.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=<tu-anon-key>
+```
 
-## Join the community
+Hay un archivo `.env.example` como referencia.
 
-Join our community of developers creating universal apps.
+---
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Iniciar la app
+
+```bash
+# Web
+npm run web
+
+# Android
+npm run android
+
+# iOS
+npm run ios
+```
+
+---
+
+## Estructura del proyecto
+
+```
+app/
+  _layout.tsx              # Layout raíz con AuthProvider y RutasProvider
+  modal.tsx
+  (tabs)/
+    _layout.tsx            # Barra de navegación inferior (5 tabs)
+    index.tsx              # Pantalla de inicio con saldo y búsqueda
+    mapa.tsx               # Mapa nativo (iOS/Android) — react-native-maps
+    mapa.web.tsx           # Mapa web — MapLibre GL + OpenFreeMap + OSRM
+    reservar.tsx           # Reserva de asientos con modal de confirmación
+    tickets.tsx            # Tickets del usuario con QR y eliminación
+    ajustes.tsx            # Perfil y configuración con logout modal
+assets/
+components/
+constants/
+  theme.ts                 # Colores y tema de la app
+context/
+  auth.tsx                 # AuthContext — sesión de Supabase
+  rutas.tsx                # RutasContext — carga de rutas desde Supabase
+database/
+  rls_policies.sql         # Políticas RLS de Supabase (ejecutar en SQL Editor)
+  migrate_usuario_uuid.sql # Migración de usuario a UUID
+hooks/
+lib/
+  supabase.ts              # Cliente de Supabase configurado (web + native storage)
+metro.config.js            # Stub de react-native-maps en plataforma web
+src/
+  stubs/
+    react-native-maps-stub.js  # Módulo vacío para evitar errores en web
+types/
+  database.ts              # Tipos generados de la base de datos Supabase
+```
+
+---
+
+## Pantallas
+
+### index.tsx — Inicio
+
+- Tarjeta de saludo con nombre del usuario
+- Balance disponible: **RD$1,500.00** (hardcodeado)
+- Barra de búsqueda
+
+### mapa.tsx / mapa.web.tsx — Mapa
+
+- 8 rutas definidas (R-001 a R-008) con waypoints reales de Santo Domingo
+- Panel de leyenda de rutas con colores diferenciados
+- Tarjeta de información al seleccionar una ruta
+- **Web**: MapLibre GL con tiles de OpenFreeMap, routing via OSRM
+- **Nativo (iOS/Android)**: `react-native-maps` con `MapView`, `Polyline` y `Marker`
+
+### reservar.tsx — Reservar
+
+- Listado de rutas activas desde Supabase
+- Modal de confirmación de reserva con:
+  - Selector de asientos (+/-)
+  - Resumen de precio (`RD$150 por asiento`)
+  - Saldo disponible (`RD$1,500`)
+- Modal de éxito tras confirmar
+- Escribe la reserva en la tabla `reservaciones` de Supabase
+
+### tickets.tsx — Tickets
+
+- Lista de tickets del usuario autenticado
+- Refresco automático al enfocar la pantalla (`useFocusEffect`)
+- Modal de confirmación antes de eliminar un ticket
+- Modal QR para visualizar el código del ticket
+- Elimina de la tabla `tickets` con política RLS activa
+
+### ajustes.tsx — Ajustes
+
+- Datos del perfil del usuario
+- Botón de cerrar sesión con modal de confirmación personalizado (sin `Alert.alert`)
+- Llama a `supabase.auth.signOut()`
+
+---
+
+## Base de datos (Supabase)
+
+### Tablas utilizadas
+
+| Tabla           | Descripción                           |
+| --------------- | ------------------------------------- |
+| `rutas`         | Rutas de transporte disponibles       |
+| `reservaciones` | Reservas de asientos por usuario      |
+| `tickets`       | Tickets generados después de reservar |
+
+### Políticas RLS
+
+El archivo `database/rls_policies.sql` contiene las políticas necesarias. Debe ejecutarse manualmente en el **SQL Editor** de Supabase, incluyendo la política `DELETE` para tickets por usuario autenticado.
+
+---
+
+## Compatibilidad de plataformas
+
+### react-native-maps en web
+
+`react-native-maps` es un módulo nativo incompatible con web. Para evitar errores de bundling se configuró:
+
+- `metro.config.js`: intercepta la resolución del módulo en plataforma `web` y redirige a un stub vacío
+- `src/stubs/react-native-maps-stub.js`: exporta `null` para `MapView`, `Marker`, `Polyline`, etc.
+- Expo resuelve `mapa.web.tsx` en web y `mapa.tsx` como fallback en nativo
+
+### Alert.alert en web
+
+`Alert.alert` no funciona en web. En todas las pantallas que requieren confirmación del usuario se usa un componente `Modal` de React Native con botones `Pressable`.
+
+---
+
+## Autenticación
+
+Manejada por `context/auth.tsx` usando `supabase.auth`. Soporta:
+
+- Login con email y contraseña (`signInWithPassword`)
+- Cierre de sesión (`signOut`)
+- Persistencia de sesión:
+  - **Web**: `localStorage`
+  - **Nativo**: `AsyncStorage`
+
+---
+
+## Comandos útiles
+
+```bash
+# Limpiar caché y reiniciar
+npx expo start --clear
+
+# Solo web
+npx expo start --web
+
+# Lint
+npm run lint
+```
+
+---
+
+## Notas de red
+
+Si el DNS local no resuelve `*.supabase.co`, configurar el servidor DNS del adaptador de red a `8.8.8.8` (Google DNS). El dominio de Supabase resuelve correctamente con DNS públicos.

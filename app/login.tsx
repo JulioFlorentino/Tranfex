@@ -52,7 +52,7 @@ export default function LoginScreen() {
       >
         <View style={styles.logoContainer}>
           <Image
-            source={require("@/assets/images/tranfexLogo.jpeg")}
+            source={require("@/assets/images/logo.png")}
             style={styles.logo}
             resizeMode="contain"
           />

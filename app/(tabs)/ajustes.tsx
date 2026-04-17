@@ -1,4 +1,12 @@
-import { StyleSheet, View, Text, TouchableOpacity, Alert } from "react-native";
+import { useState } from "react";
+import {
+  StyleSheet,
+  View,
+  Text,
+  TouchableOpacity,
+  Modal,
+  Pressable,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
@@ -9,13 +17,9 @@ export default function AjustesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "dark"];
   const { user, signOut } = useAuth();
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  const handleSignOut = () => {
-    Alert.alert("Cerrar sesión", "¿Estás seguro que deseas salir?", [
-      { text: "Cancelar", style: "cancel" },
-      { text: "Salir", style: "destructive", onPress: signOut },
-    ]);
-  };
+  const handleSignOut = () => setShowConfirm(true);
 
   const initial = user?.user_metadata?.fullName
     ? (user.user_metadata.fullName as string).charAt(0).toUpperCase()
@@ -61,6 +65,65 @@ export default function AjustesScreen() {
           Cerrar sesión
         </Text>
       </TouchableOpacity>
+
+      {/* Confirm sign out modal */}
+      <Modal
+        visible={showConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowConfirm(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowConfirm(false)}
+        >
+          <Pressable
+            style={[
+              styles.modalBox,
+              { backgroundColor: colors.card, borderColor: colors.cardBorder },
+            ]}
+            onPress={() => {}}
+          >
+            <View style={styles.signOutIconWrap}>
+              <IconSymbol name="arrow.right" size={28} color={colors.danger} />
+            </View>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Cerrar sesión
+            </Text>
+            <Text style={[styles.modalMsg, { color: colors.subtitle }]}>
+              ¿Estás seguro que deseas salir?
+            </Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[
+                  styles.modalBtn,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.cardBorder,
+                    borderWidth: 1,
+                  },
+                ]}
+                onPress={() => setShowConfirm(false)}
+              >
+                <Text style={[styles.modalBtnText, { color: colors.text }]}>
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: colors.danger }]}
+                onPress={() => {
+                  setShowConfirm(false);
+                  signOut();
+                }}
+              >
+                <Text style={[styles.modalBtnText, { color: "#fff" }]}>
+                  Salir
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -114,5 +177,53 @@ const styles = StyleSheet.create({
   signOutText: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  modalBox: {
+    width: "100%",
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 24,
+    alignItems: "center",
+  },
+  signOutIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "rgba(239,68,68,0.12)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  modalTitle: {
+    fontSize: 19,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  modalMsg: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 22,
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  modalBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
   },
 });

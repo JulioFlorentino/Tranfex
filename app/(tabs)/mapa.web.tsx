@@ -329,64 +329,68 @@ function WebMap({
     };
   }, [rutas]);
 
-  // Highlight selected route, gray out the rest
+  // Show only selected route, hide the rest
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-
-    const GRAY = "#9CA3AF";
 
     rutas.forEach((ruta, idx) => {
       const sourceId = `route-${ruta.codigo}`;
       const color = ROUTE_COLORS[idx % ROUTE_COLORS.length];
       const isSelected = selectedRoute?.codigo === ruta.codigo;
       const hasSelection = selectedRoute !== null;
-
-      const lineColor = hasSelection && !isSelected ? GRAY : color;
-      const lineOpacity = hasSelection && !isSelected ? 0.35 : 0.9;
-      const lineWidth = isSelected ? 6 : 4;
-      const borderOpacity = hasSelection && !isSelected ? 0.05 : 0.15;
-      const circleOpacity = hasSelection && !isSelected ? 0.3 : 1;
+      const visible = !hasSelection || isSelected;
+      const visibility = visible ? "visible" : "none";
 
       try {
-        map.setPaintProperty(`${sourceId}-line`, "line-color", lineColor);
-        map.setPaintProperty(`${sourceId}-line`, "line-opacity", lineOpacity);
-        map.setPaintProperty(`${sourceId}-line`, "line-width", lineWidth);
-        map.setPaintProperty(
-          `${sourceId}-border`,
-          "line-opacity",
-          borderOpacity,
-        );
-        map.setPaintProperty(
+        map.setLayoutProperty(`${sourceId}-line`, "visibility", visibility);
+        map.setLayoutProperty(`${sourceId}-border`, "visibility", visibility);
+        map.setLayoutProperty(
           `${sourceId}-origin-circle`,
-          "circle-stroke-color",
-          lineColor,
+          "visibility",
+          visibility,
         );
-        map.setPaintProperty(
-          `${sourceId}-origin-circle`,
-          "circle-opacity",
-          circleOpacity,
-        );
-        map.setPaintProperty(
-          `${sourceId}-origin-circle`,
-          "circle-stroke-opacity",
-          circleOpacity,
-        );
-        map.setPaintProperty(
+        map.setLayoutProperty(
           `${sourceId}-dest-circle`,
-          "circle-color",
-          lineColor,
+          "visibility",
+          visibility,
         );
-        map.setPaintProperty(
-          `${sourceId}-dest-circle`,
-          "circle-opacity",
-          circleOpacity,
-        );
-        map.setPaintProperty(
-          `${sourceId}-dest-circle`,
-          "circle-stroke-opacity",
-          circleOpacity,
-        );
+        if (visible) {
+          map.setPaintProperty(`${sourceId}-line`, "line-color", color);
+          map.setPaintProperty(`${sourceId}-line`, "line-opacity", 0.9);
+          map.setPaintProperty(
+            `${sourceId}-line`,
+            "line-width",
+            isSelected ? 6 : 4,
+          );
+          map.setPaintProperty(`${sourceId}-border`, "line-opacity", 0.15);
+          map.setPaintProperty(
+            `${sourceId}-origin-circle`,
+            "circle-stroke-color",
+            color,
+          );
+          map.setPaintProperty(
+            `${sourceId}-origin-circle`,
+            "circle-opacity",
+            1,
+          );
+          map.setPaintProperty(
+            `${sourceId}-origin-circle`,
+            "circle-stroke-opacity",
+            1,
+          );
+          map.setPaintProperty(
+            `${sourceId}-dest-circle`,
+            "circle-color",
+            color,
+          );
+          map.setPaintProperty(`${sourceId}-dest-circle`, "circle-opacity", 1);
+          map.setPaintProperty(
+            `${sourceId}-dest-circle`,
+            "circle-stroke-opacity",
+            1,
+          );
+        }
       } catch {
         // layer may not exist yet
       }
