@@ -41,6 +41,72 @@ export interface Database {
         };
         Relationships: [];
       };
+      paradas: {
+        Row: {
+          id_parada: number;
+          nombre: string;
+          latitud: number;
+          longitud: number;
+          direccion: string | null;
+          activo: boolean;
+        };
+        Insert: {
+          id_parada?: number;
+          nombre: string;
+          latitud: number;
+          longitud: number;
+          direccion?: string | null;
+          activo?: boolean;
+        };
+        Update: {
+          id_parada?: number;
+          nombre?: string;
+          latitud?: number;
+          longitud?: number;
+          direccion?: string | null;
+          activo?: boolean;
+        };
+        Relationships: [];
+      };
+      ruta_paradas: {
+        Row: {
+          id_ruta_parada: number;
+          ruta_id: number;
+          parada_id: number;
+          orden: number;
+          tiempo_estimado_min: number;
+        };
+        Insert: {
+          id_ruta_parada?: number;
+          ruta_id: number;
+          parada_id: number;
+          orden: number;
+          tiempo_estimado_min: number;
+        };
+        Update: {
+          id_ruta_parada?: number;
+          ruta_id?: number;
+          parada_id?: number;
+          orden?: number;
+          tiempo_estimado_min?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ruta_paradas_parada_id_fkey";
+            columns: ["parada_id"];
+            isOneToOne: false;
+            referencedRelation: "paradas";
+            referencedColumns: ["id_parada"];
+          },
+          {
+            foreignKeyName: "ruta_paradas_ruta_id_fkey";
+            columns: ["ruta_id"];
+            isOneToOne: false;
+            referencedRelation: "rutas";
+            referencedColumns: ["id_ruta"];
+          },
+        ];
+      };
       reservaciones: {
         Row: {
           id_reservacion: number;

@@ -24,41 +24,42 @@ import type { Database } from "@/types/database";
 const SALDO_DISPONIBLE = 1500; // RD$ ficticio
 const PRECIO_POR_ASIENTO = 150; // RD$ por asiento
 
-const HORAS: string[] = [];
-for (let h = 5; h <= 22; h++) {
-  HORAS.push(`${h.toString().padStart(2, "0")}:00`);
-  if (h < 22) HORAS.push(`${h.toString().padStart(2, "0")}:30`);
-}
-
-function formatHour12(h: string): string {
-  const [hh, mm] = h.split(":").map(Number);
-  const period = hh < 12 ? "AM" : "PM";
-  const h12 = hh % 12 || 12;
-  return `${h12}:${mm.toString().padStart(2, "0")} ${period}`;
-}
-
-function formatDayChip(d: Date): { top: string; bottom: string } {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  const isToday = d.getTime() === today.getTime();
-  const isTomorrow = d.getTime() === tomorrow.getTime();
-  const top = isToday
-    ? "Hoy"
-    : isTomorrow
-      ? "Mañana"
-      : d.toLocaleDateString("es-DO", { weekday: "short" });
-  const bottom = d.toLocaleDateString("es-DO", {
-    day: "numeric",
-    month: "short",
-  });
-  return { top, bottom };
-}
-
 type Ruta = Database["public"]["Tables"]["rutas"]["Row"];
 
 // ── Helpers ──────────────────────────────────────────────
+
+function roundToNextHalfHour(date: Date) {
+  const rounded = new Date(date);
+  rounded.setSeconds(0, 0);
+
+  const minutes = rounded.getMinutes();
+  const nextMinutes =
+    minutes <= 30 && minutes !== 0 ? 30 : minutes === 0 ? 0 : 60;
+
+  if (nextMinutes === 60) {
+    rounded.setHours(rounded.getHours() + 1, 0, 0, 0);
+  } else {
+    rounded.setMinutes(nextMinutes, 0, 0);
+  }
+
+  return rounded;
+}
+
+function getInitialBookingDate() {
+  const now = roundToNextHalfHour(new Date());
+  return now;
+}
+
+function getBookingDateOptions() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return Array.from({ length: 4 }, (_, index) => {
+    const option = new Date(today);
+    option.setDate(today.getDate() + index);
+    return option;
+  });
+}
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -163,25 +164,31 @@ export default function ReservarScreen() {
   const [bookingConfirm, setBookingConfirm] = useState(false);
   const [successTicket, setSuccessTicket] = useState<string | null>(null);
   const [asientos, setAsientos] = useState(1);
-  const [selectedDate, setSelectedDate] = useState<Date>(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  });
-  const [selectedHour, setSelectedHour] = useState("");
-  const [showHourPicker, setShowHourPicker] = useState(false);
+  const [fechaViaje, setFechaViaje] = useState<Date>(() =>
+    getInitialBookingDate(),
+  );
 
-  const DIAS = useMemo(() => {
-    const days: Date[] = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      days.push(d);
+  const bookingDateOptions = getBookingDateOptions();
+  const [horaTexto, setHoraTexto] = useState<string | null>(null);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const timeSlots = useMemo(() => {
+    const slots: string[] = [];
+    const now = roundToNextHalfHour(new Date());
+    const isToday = fechaViaje.toDateString() === new Date().toDateString();
+    for (let h = 0; h < 24; h++) {
+      for (const m of [0, 30]) {
+        if (isToday) {
+          const candidate = new Date(fechaViaje);
+          candidate.setHours(h, m, 0, 0);
+          if (candidate < now) continue;
+        }
+        slots.push(
+          `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
+        );
+      }
     }
-    return days;
-  }, []);
+    return slots;
+  }, [fechaViaje]);
 
   const total = asientos * PRECIO_POR_ASIENTO;
   const saldoTrasCompra = SALDO_DISPONIBLE - total;
@@ -195,26 +202,46 @@ export default function ReservarScreen() {
   const handleBook = (ruta: Ruta) => {
     if (!user) return;
     setAsientos(1);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    setSelectedDate(today);
-    setSelectedHour("");
+    const initial = getInitialBookingDate();
+    setFechaViaje(initial);
+    setHoraTexto(
+      `${String(initial.getHours()).padStart(2, "0")}:${String(initial.getMinutes()).padStart(2, "0")}`,
+    );
+    setShowTimePicker(false);
     setPendingRuta(ruta);
   };
 
   const confirmBook = async () => {
     if (!user || !pendingRuta) return;
-    if (!selectedHour) {
-      Alert.alert("Hora requerida", "Por favor selecciona una hora de salida.");
-      return;
-    }
-    const [hh, mm] = selectedHour.split(":").map(Number);
-    const fechaViaje = new Date(selectedDate);
-    fechaViaje.setHours(hh, mm, 0, 0);
-    const fechaReservaISO = fechaViaje.toISOString();
-
     setBookingConfirm(true);
     setBookingRutaId(pendingRuta.id_ruta);
+
+    // 0. Buscar viaje_activo que coincida con la ruta y la fecha seleccionada
+    let viajeId: number | null = null;
+    const dayStart = new Date(fechaViaje);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(fechaViaje);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const { data: viajes } = await (supabase
+      .from("viajes_activos")
+      .select("id_viaje, inicio_programado")
+      .eq("ruta_id", pendingRuta.id_ruta)
+      .gte("inicio_programado", dayStart.toISOString())
+      .lte("inicio_programado", dayEnd.toISOString())
+      .in("estado", ["programado", "en_curso"]) as unknown as Promise<{
+      data: { id_viaje: number; inicio_programado: string }[] | null;
+    }>);
+
+    if (viajes && viajes.length > 0) {
+      const target = fechaViaje.getTime();
+      const best = viajes.reduce((a, b) => {
+        const da = Math.abs(new Date(a.inicio_programado).getTime() - target);
+        const db = Math.abs(new Date(b.inicio_programado).getTime() - target);
+        return da <= db ? a : b;
+      });
+      viajeId = best.id_viaje;
+    }
 
     // 1. Crear reservación
     const { data: reservacion, error: resError } = await supabase
@@ -222,9 +249,10 @@ export default function ReservarScreen() {
       .insert({
         usuario_id: user.id,
         ruta_id: pendingRuta.id_ruta,
+        viaje_id: viajeId,
+        fecha_reserva: fechaViaje.toISOString(),
         asientos,
         total,
-        fecha_reserva: fechaReservaISO,
       })
       .select("id_reservacion")
       .single();
@@ -233,6 +261,7 @@ export default function ReservarScreen() {
       setBookingRutaId(null);
       setBookingConfirm(false);
       setPendingRuta(null);
+      setShowTimePicker(false);
       Alert.alert("Error", resError?.message ?? "Error al reservar");
       return;
     }
@@ -247,6 +276,8 @@ export default function ReservarScreen() {
     setBookingRutaId(null);
     setBookingConfirm(false);
     setPendingRuta(null);
+    setShowTimePicker(false);
+    setHoraTexto(null);
 
     if (ticketError) {
       Alert.alert("Error", ticketError.message);
@@ -323,132 +354,221 @@ export default function ReservarScreen() {
             ]}
             onPress={() => {}}
           >
-            <View
-              style={[
-                styles.modalIconWrap,
-                { backgroundColor: colors.accent + "20" },
-              ]}
-            >
-              <IconSymbol name="ticket.fill" size={28} color={colors.accent} />
-            </View>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Confirmar reserva
-            </Text>
-            <Text style={[styles.modalMsg, { color: colors.subtitle }]}>
-              ¿Reservar ticket para{"\n"}
-              <Text style={{ fontWeight: "700", color: colors.text }}>
-                {pendingRuta?.nombre}
-              </Text>
-              ?
-            </Text>
-            <View
-              style={[
-                styles.modalRoute,
-                { backgroundColor: colors.background },
-              ]}
-            >
-              <Text style={[styles.modalRouteText, { color: colors.subtitle }]}>
-                {pendingRuta?.origen}
-              </Text>
-              <IconSymbol
-                name="arrow.right"
-                size={12}
-                color={colors.subtitle}
-              />
-              <Text style={[styles.modalRouteText, { color: colors.subtitle }]}>
-                {pendingRuta?.destino}
-              </Text>
-            </View>
-
-            {/* Fecha de viaje */}
-            <Text style={[styles.fieldLabel, { color: colors.text }]}>Fecha</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.dateRow}
-              contentContainerStyle={{ gap: 8 }}
-            >
-              {DIAS.map((d) => {
-                const chip = formatDayChip(d);
-                const isSelected =
-                  selectedDate.getTime() === d.getTime();
-                return (
-                  <TouchableOpacity
-                    key={d.toISOString()}
-                    style={[
-                      styles.dateChip,
-                      isSelected
-                        ? { backgroundColor: colors.accent }
-                        : {
-                            backgroundColor: colors.background,
-                            borderColor: colors.cardBorder,
-                            borderWidth: 1,
-                          },
-                    ]}
-                    onPress={() => setSelectedDate(d)}
-                    disabled={bookingConfirm}
-                  >
-                    <Text
-                      style={[
-                        styles.dateChipTop,
-                        { color: isSelected ? "#fff" : colors.subtitle },
-                      ]}
-                    >
-                      {chip.top}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.dateChipBottom,
-                        { color: isSelected ? "#fff" : colors.text },
-                      ]}
-                    >
-                      {chip.bottom}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            {/* Hora de salida */}
-            <Text style={[styles.fieldLabel, { color: colors.text }]}>
-              Hora de salida
-            </Text>
-            <TouchableOpacity
-              style={[
-                styles.hourBtn,
-                {
-                  backgroundColor: colors.background,
-                  borderColor: selectedHour
-                    ? colors.accent
-                    : colors.cardBorder,
-                },
-              ]}
-              onPress={() => !bookingConfirm && setShowHourPicker(true)}
-              disabled={bookingConfirm}
-            >
-              <IconSymbol
-                name="clock"
-                size={16}
-                color={selectedHour ? colors.accent : colors.subtitle}
-              />
-              <Text
+            {/* Icon + title + route */}
+            <View style={styles.modalTop}>
+              <View
                 style={[
-                  styles.hourBtnText,
-                  { color: selectedHour ? colors.text : colors.subtitle },
+                  styles.modalIconWrap,
+                  { backgroundColor: colors.accent + "20" },
                 ]}
               >
-                {selectedHour
-                  ? formatHour12(selectedHour)
-                  : "Seleccionar hora"}
+                <IconSymbol
+                  name="ticket.fill"
+                  size={28}
+                  color={colors.accent}
+                />
+              </View>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Confirmar reserva
               </Text>
-              <IconSymbol
-                name="chevron.down"
-                size={12}
-                color={colors.subtitle}
-              />
-            </TouchableOpacity>
+              <Text style={[styles.modalMsg, { color: colors.subtitle }]}>
+                ¿Reservar ticket para{"\n"}
+                <Text style={{ fontWeight: "700", color: colors.text }}>
+                  {pendingRuta?.nombre}
+                </Text>
+                ?
+              </Text>
+              <View
+                style={[
+                  styles.modalRoute,
+                  { backgroundColor: colors.background },
+                ]}
+              >
+                <Text
+                  style={[styles.modalRouteText, { color: colors.subtitle }]}
+                >
+                  {pendingRuta?.origen}
+                </Text>
+                <IconSymbol
+                  name="arrow.right"
+                  size={12}
+                  color={colors.subtitle}
+                />
+                <Text
+                  style={[styles.modalRouteText, { color: colors.subtitle }]}
+                >
+                  {pendingRuta?.destino}
+                </Text>
+              </View>
+            </View>
 
-            {/* Selector de asientos */}
+            {/* Fecha */}
+            <View style={styles.fieldBlock}>
+              <Text style={[styles.fieldLabel, { color: colors.text }]}>
+                Fecha
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.dateChipsRow}
+              >
+                {bookingDateOptions.map((option) => {
+                  const selected =
+                    option.toDateString() === fechaViaje.toDateString();
+                  const isToday =
+                    option.toDateString() === new Date().toDateString();
+                  const tomorrow = new Date();
+                  tomorrow.setDate(tomorrow.getDate() + 1);
+                  const isTomorrow =
+                    option.toDateString() === tomorrow.toDateString();
+                  return (
+                    <TouchableOpacity
+                      key={option.toISOString()}
+                      style={[
+                        styles.dateChip,
+                        {
+                          backgroundColor: selected
+                            ? colors.accent
+                            : colors.background,
+                          borderColor: selected
+                            ? colors.accent
+                            : colors.cardBorder,
+                        },
+                      ]}
+                      onPress={() =>
+                        setFechaViaje((c) => {
+                          const n = new Date(option);
+                          n.setHours(c.getHours(), c.getMinutes(), 0, 0);
+                          return n;
+                        })
+                      }
+                      disabled={bookingConfirm}
+                    >
+                      <Text
+                        style={[
+                          styles.dateChipTop,
+                          {
+                            color: selected
+                              ? "rgba(255,255,255,0.75)"
+                              : colors.subtitle,
+                          },
+                        ]}
+                      >
+                        {isToday
+                          ? "Hoy"
+                          : isTomorrow
+                            ? "Mañana"
+                            : option.toLocaleDateString("es-DO", {
+                                weekday: "short",
+                              })}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.dateChipBottom,
+                          { color: selected ? "#fff" : colors.text },
+                        ]}
+                      >
+                        {option.toLocaleDateString("es-DO", {
+                          day: "2-digit",
+                          month: "short",
+                        })}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* Hora de salida */}
+            <View style={styles.fieldBlock}>
+              <Text style={[styles.fieldLabel, { color: colors.text }]}>
+                Hora de salida
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.timeField,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.cardBorder,
+                  },
+                ]}
+                onPress={() => setShowTimePicker((v) => !v)}
+                disabled={bookingConfirm}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.timeFieldText,
+                    { color: horaTexto ? colors.text : colors.subtitle },
+                  ]}
+                >
+                  {horaTexto ?? "Seleccionar hora"}
+                </Text>
+                <View
+                  style={{
+                    transform: [
+                      { rotate: showTimePicker ? "-90deg" : "90deg" },
+                    ],
+                  }}
+                >
+                  <IconSymbol
+                    name="chevron.right"
+                    size={16}
+                    color={colors.subtitle}
+                  />
+                </View>
+              </TouchableOpacity>
+              {showTimePicker && (
+                <ScrollView
+                  style={[
+                    styles.timeDropdown,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.cardBorder,
+                    },
+                  ]}
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator={false}
+                >
+                  {timeSlots.map((slot) => {
+                    const sel = slot === horaTexto;
+                    return (
+                      <TouchableOpacity
+                        key={slot}
+                        style={[
+                          styles.timeSlotItem,
+                          sel && { backgroundColor: colors.accent + "15" },
+                        ]}
+                        onPress={() => {
+                          const [h, m] = slot.split(":").map(Number);
+                          setFechaViaje((d) => {
+                            const n = new Date(d);
+                            n.setHours(h, m, 0, 0);
+                            return n;
+                          });
+                          setHoraTexto(slot);
+                          setShowTimePicker(false);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.timeSlotText,
+                            {
+                              color: sel ? colors.accent : colors.text,
+                              fontWeight: sel ? "700" : "400",
+                            },
+                          ]}
+                        >
+                          {slot}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+            </View>
+
+            {/* Asientos */}
             <View style={[styles.seatsRow, { borderColor: colors.cardBorder }]}>
               <Text style={[styles.seatsLabel, { color: colors.text }]}>
                 Asientos
@@ -529,7 +649,9 @@ export default function ReservarScreen() {
                 <Text
                   style={[
                     styles.priceValue,
-                    { color: saldoTrasCompra >= 0 ? "#22C55E" : "#EF4444" },
+                    {
+                      color: saldoTrasCompra >= 0 ? "#22C55E" : "#EF4444",
+                    },
                   ]}
                 >
                   RD${saldoTrasCompra.toFixed(2)}
@@ -537,6 +659,7 @@ export default function ReservarScreen() {
               </View>
             </View>
 
+            {/* Actions */}
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={[
@@ -634,73 +757,6 @@ export default function ReservarScreen() {
                 Entendido
               </Text>
             </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Hour picker modal */}
-      <Modal
-        visible={showHourPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowHourPicker(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowHourPicker(false)}
-        >
-          <Pressable
-            style={[
-              styles.modalCard,
-              styles.hourPickerCard,
-              { backgroundColor: colors.card, borderColor: colors.cardBorder },
-            ]}
-            onPress={() => {}}
-          >
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Hora de salida
-            </Text>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              style={styles.hourList}
-            >
-              {HORAS.map((h) => (
-                <TouchableOpacity
-                  key={h}
-                  style={[
-                    styles.hourItem,
-                    selectedHour === h && {
-                      backgroundColor: colors.accent + "20",
-                    },
-                    { borderBottomColor: colors.cardBorder },
-                  ]}
-                  onPress={() => {
-                    setSelectedHour(h);
-                    setShowHourPicker(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.hourItemText,
-                      {
-                        color:
-                          selectedHour === h ? colors.accent : colors.text,
-                        fontWeight: selectedHour === h ? "700" : "400",
-                      },
-                    ]}
-                  >
-                    {formatHour12(h)}
-                  </Text>
-                  {selectedHour === h && (
-                    <IconSymbol
-                      name="checkmark"
-                      size={14}
-                      color={colors.accent}
-                    />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
@@ -827,11 +883,15 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: "100%",
-    maxWidth: 360,
+    maxWidth: 400,
     borderRadius: 18,
     borderWidth: 1,
     padding: 24,
-    alignItems: "center",
+    gap: 14,
+  },
+  modalTop: {
+    alignItems: "center" as const,
+    gap: 6,
   },
   modalIconWrap: {
     width: 64,
@@ -849,18 +909,16 @@ const styles = StyleSheet.create({
   },
   modalMsg: {
     fontSize: 14,
-    textAlign: "center",
+    textAlign: "center" as const,
     lineHeight: 22,
-    marginBottom: 14,
   },
   modalRoute: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
     gap: 8,
     borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    marginBottom: 20,
   },
   modalRouteText: {
     fontSize: 13,
@@ -917,6 +975,70 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
+  selectionGroup: {
+    flexDirection: "row" as const,
+    flexWrap: "wrap" as const,
+    justifyContent: "flex-end" as const,
+    gap: 8,
+    flex: 1,
+  },
+
+  // Date / time field styles
+  fieldBlock: {
+    width: "100%" as const,
+    gap: 8,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+  },
+  dateChipsRow: {
+    flexDirection: "row" as const,
+    gap: 8,
+    paddingVertical: 2,
+  },
+  dateChip: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: "center" as const,
+    gap: 2,
+  },
+  dateChipTop: {
+    fontSize: 11,
+    fontWeight: "500" as const,
+  },
+  dateChipBottom: {
+    fontSize: 13,
+    fontWeight: "700" as const,
+  },
+  timeField: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "space-between" as const,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  timeFieldText: {
+    fontSize: 15,
+  },
+  timeDropdown: {
+    maxHeight: 180,
+    borderWidth: 1,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  timeSlotItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  timeSlotText: {
+    fontSize: 15,
+  },
+
   // Price summary
   priceSummary: {
     width: "100%",
@@ -941,69 +1063,6 @@ const styles = StyleSheet.create({
   priceDivider: {
     height: 1,
     marginVertical: 2,
-  },
-
-  // Date / hour fields
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    marginBottom: 8,
-    alignSelf: "flex-start",
-  },
-  dateRow: {
-    width: "100%",
-    marginBottom: 14,
-  },
-  dateChip: {
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    alignItems: "center",
-    minWidth: 72,
-  },
-  dateChipTop: {
-    fontSize: 11,
-    marginBottom: 2,
-  },
-  dateChipBottom: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  hourBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    width: "100%",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 14,
-  },
-  hourBtnText: {
-    flex: 1,
-    fontSize: 14,
-  },
-  // Hour picker modal
-  hourPickerCard: {
-    paddingBottom: 8,
-  },
-  hourList: {
-    width: "100%",
-    maxHeight: 320,
-    marginTop: 8,
-  },
-  hourItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderRadius: 6,
-  },
-  hourItemText: {
-    fontSize: 15,
   },
   modalBtn: {
     flex: 1,

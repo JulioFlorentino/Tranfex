@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -56,10 +57,12 @@ function RouteCard({
 function QuickAccessCard({
   icon,
   label,
+  onPress,
   colors,
 }: {
   icon: React.ComponentProps<typeof IconSymbol>["name"];
   label: string;
+  onPress: () => void;
   colors: typeof Colors.dark;
 }) {
   return (
@@ -69,6 +72,7 @@ function QuickAccessCard({
         { backgroundColor: colors.card, borderColor: colors.cardBorder },
       ]}
       activeOpacity={0.7}
+      onPress={onPress}
     >
       <IconSymbol name={icon} size={28} color={colors.accent} />
       <Text style={[styles.quickLabel, { color: colors.text }]}>{label}</Text>
@@ -80,6 +84,7 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "dark"];
   const { user } = useAuth();
+  const router = useRouter();
 
   const fullName =
     user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Usuario";
@@ -186,9 +191,27 @@ export default function HomeScreen() {
           <QuickAccessCard
             icon="ticket.fill"
             label="Mis tickets"
+            onPress={() => router.push("/(tabs)/tickets")}
             colors={colors}
           />
-          <QuickAccessCard icon="map.fill" label="Ver mapa" colors={colors} />
+          <QuickAccessCard
+            icon="map.fill"
+            label="Ver mapa"
+            onPress={() => router.push("/(tabs)/mapa")}
+            colors={colors}
+          />
+          <QuickAccessCard
+            icon="calendar"
+            label="Reservar"
+            onPress={() => router.push("/(tabs)/reservar")}
+            colors={colors}
+          />
+          <QuickAccessCard
+            icon="gearshape.fill"
+            label="Ajustes"
+            onPress={() => router.push("/(tabs)/ajustes")}
+            colors={colors}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -321,10 +344,11 @@ const styles = StyleSheet.create({
   },
   quickRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
   },
   quickCard: {
-    flex: 1,
+    width: "47%",
     alignItems: "center",
     justifyContent: "center",
     padding: 20,

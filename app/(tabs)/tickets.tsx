@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { useFocusEffect } from "expo-router";
 import {
   StyleSheet,
   View,
@@ -33,6 +32,7 @@ interface TicketConDetalles {
     asientos: number;
     estado: string;
     total: number;
+    viaje_id: number | null;
     rutas: {
       nombre: string;
       codigo: string;
@@ -40,6 +40,12 @@ interface TicketConDetalles {
       destino: string;
     };
   };
+}
+
+interface ViajeInfo {
+  chofer: string;
+  vehiculo: string;
+  placa: string;
 }
 
 // ── Helpers ──────────────────────────────────────────────
@@ -141,16 +147,6 @@ function TicketCard({
 
       {/* Details */}
       <View style={styles.ticketDetails}>
-        {reserva?.fecha_reserva && (
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { color: colors.subtitle }]}>
-              Fecha de viaje
-            </Text>
-            <Text style={[styles.detailValue, { color: colors.text }]}>
-              {formatDate(reserva.fecha_reserva)}
-            </Text>
-          </View>
-        )}
         <View style={styles.detailRow}>
           <Text style={[styles.detailLabel, { color: colors.subtitle }]}>
             Emitido
@@ -222,6 +218,8 @@ export default function TicketsScreen() {
   const [selectedTicket, setSelectedTicket] =
     useState<TicketConDetalles | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [viajeInfo, setViajeInfo] = useState<ViajeInfo | null>(null);
+  const [loadingViaje, setLoadingViaje] = useState(false);
   const [ticketToDelete, setTicketToDelete] =
     useState<TicketConDetalles | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -244,6 +242,7 @@ export default function TicketsScreen() {
           asientos,
           estado,
           total,
+          viaje_id,
           rutas (
             nombre,
             codigo,
@@ -263,11 +262,27 @@ export default function TicketsScreen() {
     setLoading(false);
   }, [user]);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchTickets();
-    }, [fetchTickets]),
-  );
+  useEffect(() => {
+    fetchTickets();
+  }, [fetchTickets]);
+
+  // Real-time: refresh when a new ticket is inserted
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel("tickets-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "tickets" },
+        () => {
+          fetchTickets();
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchTickets]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -277,8 +292,57 @@ export default function TicketsScreen() {
 
   const openQR = useCallback(async (ticket: TicketConDetalles) => {
     setSelectedTicket(ticket);
+    setViajeInfo(null);
+    setLoadingViaje(false);
+
+    // Fetch chofer + vehiculo if the reservation has a viaje
+    const viajeId = ticket.reservaciones?.viaje_id;
+    if (viajeId) {
+      setLoadingViaje(true);
+      const { data: viaje } = await supabase
+        .from("viajes_activos")
+        .select(
+          `
+          choferes ( nombre, apellido ),
+          vehiculos ( modelo, marca, placa )
+        `,
+        )
+        .eq("id_viaje", viajeId)
+        .single<{
+          choferes: { nombre: string; apellido: string };
+          vehiculos: { modelo: string; marca: string; placa: string };
+        }>();
+
+      if (viaje) {
+        setViajeInfo({
+          chofer: `${viaje.choferes.nombre} ${viaje.choferes.apellido}`,
+          vehiculo: `${viaje.vehiculos.marca} ${viaje.vehiculos.modelo}`,
+          placa: viaje.vehiculos.placa,
+        });
+      }
+      setLoadingViaje(false);
+    }
+
+    // Build QR payload with all available info
+    const ruta = ticket.reservaciones?.rutas;
+    const reserva = ticket.reservaciones;
+    const viajeData = viajeId
+      ? {} // will be enriched after fetch resolves; QR uses codigo only for scanning
+      : {};
+    void viajeData;
+
+    const qrPayload = JSON.stringify({
+      codigo: ticket.codigo_ticket,
+      ruta: ruta?.nombre ?? "",
+      origen: ruta?.origen ?? "",
+      destino: ruta?.destino ?? "",
+      fecha: reserva?.fecha_reserva ?? "",
+      asientos: reserva?.asientos ?? 1,
+      total: reserva?.total ?? 0,
+    });
+
     try {
-      const url = await QRCode.toDataURL(ticket.codigo_ticket, {
+      const url = await QRCode.toDataURL(qrPayload, {
         width: 250,
         margin: 2,
         color: { dark: "#000000", light: "#FFFFFF" },
@@ -292,6 +356,7 @@ export default function TicketsScreen() {
   const closeQR = useCallback(() => {
     setSelectedTicket(null);
     setQrDataUrl(null);
+    setViajeInfo(null);
   }, []);
 
   const handleDelete = useCallback((ticket: TicketConDetalles) => {
@@ -579,6 +644,26 @@ export default function TicketsScreen() {
                       </Text>
                     </View>
                   )}
+                  {selectedTicket.reservaciones?.asientos && (
+                    <View style={styles.modalDetailRow}>
+                      <Text
+                        style={[
+                          styles.modalDetailLabel,
+                          { color: colors.subtitle },
+                        ]}
+                      >
+                        Asientos
+                      </Text>
+                      <Text
+                        style={[
+                          styles.modalDetailValue,
+                          { color: colors.text },
+                        ]}
+                      >
+                        {selectedTicket.reservaciones.asientos}
+                      </Text>
+                    </View>
+                  )}
                   <View style={styles.modalDetailRow}>
                     <Text
                       style={[
@@ -634,6 +719,85 @@ export default function TicketsScreen() {
                         {Number(selectedTicket.reservaciones.total).toFixed(2)}
                       </Text>
                     </View>
+                  )}
+
+                  {/* Divider para info de viaje */}
+                  {selectedTicket.reservaciones?.viaje_id && (
+                    <>
+                      <View
+                        style={[
+                          styles.modalDivider,
+                          { backgroundColor: colors.cardBorder },
+                        ]}
+                      />
+                      {loadingViaje ? (
+                        <ActivityIndicator
+                          size="small"
+                          color={colors.accent}
+                          style={{ marginVertical: 6 }}
+                        />
+                      ) : viajeInfo ? (
+                        <>
+                          <View style={styles.modalDetailRow}>
+                            <Text
+                              style={[
+                                styles.modalDetailLabel,
+                                { color: colors.subtitle },
+                              ]}
+                            >
+                              Chofer
+                            </Text>
+                            <Text
+                              style={[
+                                styles.modalDetailValue,
+                                { color: colors.text },
+                              ]}
+                            >
+                              {viajeInfo.chofer}
+                            </Text>
+                          </View>
+                          <View style={styles.modalDetailRow}>
+                            <Text
+                              style={[
+                                styles.modalDetailLabel,
+                                { color: colors.subtitle },
+                              ]}
+                            >
+                              Vehículo
+                            </Text>
+                            <Text
+                              style={[
+                                styles.modalDetailValue,
+                                { color: colors.text },
+                              ]}
+                            >
+                              {viajeInfo.vehiculo}
+                            </Text>
+                          </View>
+                          <View style={styles.modalDetailRow}>
+                            <Text
+                              style={[
+                                styles.modalDetailLabel,
+                                { color: colors.subtitle },
+                              ]}
+                            >
+                              Placa
+                            </Text>
+                            <Text
+                              style={[
+                                styles.modalDetailValue,
+                                {
+                                  color: colors.accent,
+                                  fontFamily: "monospace",
+                                },
+                              ]}
+                            >
+                              {viajeInfo.placa}
+                            </Text>
+                          </View>
+                        </>
+                      ) : null}
+                    </>
                   )}
                 </View>
 
@@ -860,6 +1024,13 @@ const styles = StyleSheet.create({
   modalDetailValue: {
     fontSize: 13,
     fontWeight: "600",
+    maxWidth: "60%",
+    textAlign: "right",
+  },
+  modalDivider: {
+    height: 1,
+    width: "100%",
+    marginVertical: 4,
   },
   modalCloseBtn: {
     width: "100%",

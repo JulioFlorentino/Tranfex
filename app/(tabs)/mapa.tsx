@@ -15,6 +15,16 @@ import { useRutas } from "@/context/rutas";
 import type { Database } from "@/types/database";
 
 type Ruta = Database["public"]["Tables"]["rutas"]["Row"];
+type Parada = Database["public"]["Tables"]["paradas"]["Row"];
+
+interface ParadaDeRuta extends Parada {
+  orden: number;
+  tiempo_estimado_min: number;
+}
+
+interface RutaConParadas extends Ruta {
+  paradas?: ParadaDeRuta[];
+}
 
 const SANTO_DOMINGO = { latitude: 18.4861, longitude: -69.9312 };
 
@@ -121,7 +131,9 @@ export default function MapaScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? "dark"];
   const { rutas } = useRutas();
-  const [selectedRoute, setSelectedRoute] = useState<Ruta | null>(null);
+  const [selectedRoute, setSelectedRoute] = useState<RutaConParadas | null>(
+    null,
+  );
   const [showLegend, setShowLegend] = useState(false);
 
   const mapRef = useState<MapView | null>(null);
@@ -152,6 +164,11 @@ export default function MapaScreen() {
           const lineWidth = isSelected ? 6 : 3;
           const origin = coordinates[0];
           const dest = coordinates[coordinates.length - 1];
+
+          // Ordenar paradas por orden
+          const paradasOrdenadas = ruta.paradas
+            ? [...ruta.paradas].sort((a, b) => a.orden - b.orden)
+            : [];
 
           return [
             <Polyline
@@ -198,6 +215,28 @@ export default function MapaScreen() {
                 ]}
               />
             </Marker>,
+            // Renderizar paradas intermedias cuando la ruta está seleccionada
+            ...(isSelected && paradasOrdenadas.length > 0
+              ? paradasOrdenadas.map((parada) => (
+                  <Marker
+                    key={`parada-${parada.id_parada}`}
+                    coordinate={{
+                      latitude: Number(parada.latitud),
+                      longitude: Number(parada.longitud),
+                    }}
+                    anchor={{ x: 0.5, y: 0.5 }}
+                  >
+                    <View style={styles.paradaMarker}>
+                      <View
+                        style={[
+                          styles.paradaMarkerInner,
+                          { backgroundColor: color },
+                        ]}
+                      />
+                    </View>
+                  </Marker>
+                ))
+              : []),
           ];
         })}
       </MapView>
@@ -315,6 +354,69 @@ export default function MapaScreen() {
               </Text>
             </View>
           </View>
+
+          {/* Paradas list */}
+          {selectedRoute.paradas && selectedRoute.paradas.length > 0 && (
+            <View style={styles.paradasSection}>
+              <Text style={[styles.paradasTitle, { color: colors.text }]}>
+                Paradas ({selectedRoute.paradas.length})
+              </Text>
+              <ScrollView
+                style={styles.paradasList}
+                scrollEnabled={selectedRoute.paradas.length > 3}
+              >
+                {[...selectedRoute.paradas]
+                  .sort((a, b) => a.orden - b.orden)
+                  .map((parada, idx) => (
+                    <View
+                      key={parada.id_parada}
+                      style={[
+                        styles.paradaItem,
+                        {
+                          borderColor: colors.cardBorder,
+                        },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.paradaNumber,
+                          {
+                            backgroundColor: colors.accent + "20",
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.paradaNumberText,
+                            { color: colors.accent },
+                          ]}
+                        >
+                          {idx + 1}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[styles.paradaName, { color: colors.text }]}
+                        numberOfLines={1}
+                      >
+                        {parada.nombre}
+                      </Text>
+                    </View>
+                  ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {(!selectedRoute.paradas || selectedRoute.paradas.length === 0) && (
+            <View style={styles.paradasSection}>
+              <Text style={[styles.paradasTitle, { color: colors.text }]}>
+                Paradas
+              </Text>
+              <Text style={[styles.routeInfoText, { color: colors.subtitle }]}>
+                Esta ruta no tiene paradas disponibles.
+              </Text>
+            </View>
+          )}
+
           <TouchableOpacity
             style={[
               styles.unfollowBtn,
@@ -352,6 +454,22 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
+  },
+  paradaMarker: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderWidth: 2,
+  },
+  paradaMarkerInner: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    borderColor: "#fff",
+    borderWidth: 1,
   },
 
   // Top bar
@@ -459,6 +577,45 @@ const styles = StyleSheet.create({
   },
   routeInfoText: {
     fontSize: 13,
+  },
+  paradasSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0,0,0,0.1)",
+  },
+  paradasTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  paradasList: {
+    maxHeight: 120,
+  },
+  paradaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    marginBottom: 6,
+    borderBottomWidth: 1,
+  },
+  paradaNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  paradaNumberText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  paradaName: {
+    fontSize: 12,
+    flex: 1,
   },
   unfollowBtn: {
     flexDirection: "row",
