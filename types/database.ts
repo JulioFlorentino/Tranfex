@@ -183,6 +183,44 @@ export interface Database {
           },
         ];
       };
+      metodos_pago: {
+        Row: {
+          id_metodo: number;
+          usuario_id: number;
+          tipo: string;
+          marca: string | null;
+          ultimos4: string | null;
+          activo: boolean;
+          creado_en: string;
+        };
+        Insert: {
+          id_metodo?: number;
+          usuario_id: number;
+          tipo: string;
+          marca?: string | null;
+          ultimos4?: string | null;
+          activo?: boolean;
+          creado_en?: string;
+        };
+        Update: {
+          id_metodo?: number;
+          usuario_id?: number;
+          tipo?: string;
+          marca?: string | null;
+          ultimos4?: string | null;
+          activo?: boolean;
+          creado_en?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "metodos_pago_usuario_id_fkey";
+            columns: ["usuario_id"];
+            isOneToOne: false;
+            referencedRelation: "usuarios";
+            referencedColumns: ["id_usuario"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

@@ -36,86 +36,122 @@ const ROUTE_WAYPOINTS: Record<string, { points: [number, number][] }> = {
     // Villa Mella → Megacentro (Av. Charles de Gaulle sur)
     points: [
       [-69.933, 18.536],
-      [-69.9305, 18.518],
+      [-69.9325, 18.528],
+      [-69.9315, 18.52],
+      [-69.9305, 18.512],
+      [-69.929, 18.504],
       [-69.926, 18.502],
+      [-69.922, 18.496],
       [-69.918, 18.492],
+      [-69.914, 18.487],
       [-69.911, 18.482],
     ],
   },
+
   "R-002": {
-    // Herrera → San Isidro (Av. Luperón → Av. 27 de Febrero → este)
     points: [
       [-69.968, 18.495],
-      [-69.95, 18.489],
+      [-69.958, 18.492],
+      [-69.948, 18.489],
+      [-69.94, 18.487],
       [-69.932, 18.486],
+      [-69.922, 18.487],
       [-69.91, 18.488],
+      [-69.9, 18.49],
       [-69.89, 18.493],
       [-69.876, 18.496],
     ],
   },
+
   "R-003": {
-    // Los Alcarrizos → Sans Souci (Autopista Duarte → Av. Kennedy → Av. España)
     points: [
       [-69.986, 18.512],
+      [-69.975, 18.507],
       [-69.965, 18.5],
+      [-69.955, 18.495],
       [-69.943, 18.49],
+      [-69.932, 18.487],
       [-69.92, 18.486],
+      [-69.91, 18.488],
       [-69.895, 18.492],
+      [-69.875, 18.496],
       [-69.857, 18.5],
     ],
   },
+
   "R-004": {
-    // Arroyo Hondo → Centro Olímpico (Av. Núñez de Cáceres sur)
     points: [
       [-69.943, 18.505],
-      [-69.935, 18.498],
-      [-69.93, 18.492],
-      [-69.925, 18.486],
+      [-69.94, 18.502],
+      [-69.937, 18.498],
+      [-69.933, 18.494],
+      [-69.93, 18.49],
+      [-69.927, 18.486],
+      [-69.924, 18.482],
       [-69.921, 18.479],
       [-69.92, 18.473],
     ],
   },
+
   "R-005": {
-    // Villa Duarte → Av. Máximo Gómez (Puente Duarte → norte)
     points: [
       [-69.875, 18.483],
+      [-69.88, 18.482],
       [-69.885, 18.481],
+      [-69.89, 18.482],
       [-69.896, 18.483],
-      [-69.91, 18.487],
+      [-69.905, 18.485],
+      [-69.915, 18.488],
       [-69.922, 18.491],
+      [-69.928, 18.494],
       [-69.932, 18.496],
     ],
   },
+
   "R-006": {
-    // Cristo Rey → Los Mina (Av. Correa y Cidrón → este del río Ozama)
     points: [
       [-69.935, 18.501],
+      [-69.928, 18.498],
       [-69.923, 18.496],
+      [-69.918, 18.494],
       [-69.91, 18.492],
+      [-69.902, 18.49],
       [-69.897, 18.488],
+      [-69.89, 18.487],
       [-69.883, 18.486],
+      [-69.875, 18.487],
       [-69.868, 18.488],
     ],
   },
+
   "R-007": {
-    // Los Ríos → Zona Colonial (Av. Tiradentes → Av. Independencia → Parque Colón)
     points: [
       [-69.96, 18.492],
+      [-69.952, 18.49],
       [-69.947, 18.488],
+      [-69.94, 18.486],
       [-69.933, 18.484],
+      [-69.925, 18.482],
       [-69.919, 18.48],
+      [-69.912, 18.478],
       [-69.904, 18.477],
+      [-69.895, 18.475],
       [-69.8835, 18.4735],
     ],
   },
+
   "R-008": {
-    // Gazcue → Villa Mella (Av. Máximo Gómez norte → Av. Charles de Gaulle)
     points: [
       [-69.92, 18.471],
+      [-69.922, 18.476],
       [-69.924, 18.481],
+      [-69.926, 18.487],
       [-69.928, 18.492],
+      [-69.93, 18.498],
       [-69.931, 18.504],
-      [-69.932, 18.518],
+      [-69.932, 18.51],
+      [-69.9325, 18.518],
+      [-69.933, 18.528],
       [-69.933, 18.536],
     ],
   },
@@ -130,18 +166,21 @@ async function fetchOSRMRoute(
 ): Promise<[number, number][]> {
   try {
     const coords = waypoints.map((p) => `${p[0]},${p[1]}`).join(";");
-    const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`;
+
+    const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=true&annotations=true`;
+
     const res = await fetch(url);
     const json = await res.json();
+
     if (json.code === "Ok" && json.routes?.[0]?.geometry?.coordinates) {
-      return json.routes[0].geometry.coordinates as [number, number][];
+      return json.routes[0].geometry.coordinates;
     }
-  } catch {
-    // fall through to fallback
+  } catch (err) {
+    console.log("OSRM error:", err);
   }
+
   return waypoints;
 }
-
 // ── Web Map Component ────────────────────────────────────
 
 function WebMap({
@@ -198,7 +237,8 @@ function WebMap({
           rutas.map(async (ruta) => {
             const wp = ROUTE_WAYPOINTS[ruta.codigo];
             if (!wp) return null;
-            const path = await fetchOSRMRoute(wp.points);
+            const rawPath = await fetchOSRMRoute(wp.points);
+            const path = smoothRoute(rawPath);
             return {
               codigo: ruta.codigo,
               path,
@@ -403,6 +443,25 @@ function WebMap({
       style={{ width: "100%", height: "100%", position: "absolute" }}
     />
   );
+}
+
+function smoothRoute(coords: [number, number][]) {
+  if (coords.length < 2) return coords;
+
+  const smooth: [number, number][] = [];
+
+  for (let i = 0; i < coords.length - 1; i++) {
+    const [lng1, lat1] = coords[i];
+    const [lng2, lat2] = coords[i + 1];
+
+    smooth.push([lng1, lat1]);
+
+    smooth.push([(lng1 + lng2) / 2, (lat1 + lat2) / 2]);
+  }
+
+  smooth.push(coords[coords.length - 1]);
+
+  return smooth;
 }
 
 // ── Main Screen ──────────────────────────────────────────
@@ -624,7 +683,7 @@ const styles = StyleSheet.create({
   // Legend
   legendPanel: {
     position: "absolute",
-    top: 100,
+    top: 60,
     right: 16,
     width: 260,
     maxHeight: 350,

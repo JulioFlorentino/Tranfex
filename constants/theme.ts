@@ -5,36 +5,36 @@
 
 import { Platform } from "react-native";
 
-const tintColorLight = "#1E6FD9";
-const tintColorDark = "#4A9EFF";
+const tintColorLight = "#1A4FA3";
+const tintColorDark = "#3B82F6";
 
 export const Colors = {
   light: {
-    text: "#11181C",
-    background: "#F0F4FA",
+    text: "#0D1B3E",
+    background: "#E8EDF8",
     tint: tintColorLight,
-    icon: "#687076",
-    tabIconDefault: "#687076",
+    icon: "#3B5280",
+    tabIconDefault: "#6B7FA8",
     tabIconSelected: tintColorLight,
-    card: "#FFFFFF",
-    cardBorder: "#E2E8F0",
-    subtitle: "#64748B",
-    accent: "#1E6FD9",
-    success: "#22C55E",
-    warning: "#F59E0B",
-    danger: "#EF4444",
+    card: "#F0F4FF",
+    cardBorder: "#C5D0E8",
+    subtitle: "#4A6490",
+    accent: "#1A4FA3",
+    success: "#16A34A",
+    warning: "#D97706",
+    danger: "#DC2626",
   },
   dark: {
-    text: "#ECEDEE",
-    background: "#0B1120",
+    text: "#E2E8F8",
+    background: "#060C1A",
     tint: tintColorDark,
-    icon: "#9BA1A6",
-    tabIconDefault: "#5A6272",
+    icon: "#7A90C0",
+    tabIconDefault: "#3D5080",
     tabIconSelected: tintColorDark,
-    card: "#131C2E",
-    cardBorder: "#1E293B",
-    subtitle: "#94A3B8",
-    accent: "#4A9EFF",
+    card: "#0C1428",
+    cardBorder: "#152040",
+    subtitle: "#7A90B8",
+    accent: "#3B82F6",
     success: "#22C55E",
     warning: "#F59E0B",
     danger: "#EF4444",

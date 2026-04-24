@@ -30,6 +30,8 @@ const MAPPING = {
   "bus.fill": "directions-bus",
   "mappin.and.ellipse": "place",
   "arrow.right": "arrow-forward",
+  "creditcard.fill": "credit-card",
+  "plus.circle": "add-circle-outline",
 } as IconMapping;
 
 /**
